@@ -8,6 +8,7 @@ import { useEffect, useRef } from "react";
 
 export default function Scene({ onSelect }: { onSelect: (id: string) => void }) {
   const groupRef = useRef<THREE.Group>(null);
+  const regionNodesRef = useRef(new Map<string, THREE.Object3D>());
 
   const gltf = useLoader(
     GLTFLoader,
@@ -27,10 +28,10 @@ export default function Scene({ onSelect }: { onSelect: (id: string) => void }) 
       gltf.scene.position.sub(center);
 
       // Create a map to store region names and their top-level nodes
-      const regionNodes = new Map<string, THREE.Object3D>();      // First pass: find all top-level objects (regions)
-      gltf.scene.children.forEach((obj) => {        // Store the original object name without leading underscores, asterisks, and question marks
+      regionNodesRef.current.clear();
+      gltf.scene.children.forEach((obj) => {
         const regionName = obj.name.replace(/^_+/, "").replace(/[\*\?]/g, "");
-        regionNodes.set(regionName, obj);
+        regionNodesRef.current.set(regionName, obj);
         console.log("Region found:", regionName);
       });
 
@@ -43,12 +44,27 @@ export default function Scene({ onSelect }: { onSelect: (id: string) => void }) 
       ref={groupRef}
       onPointerDown={(e) => {
         e.stopPropagation();
-        // Traverse up the parent hierarchy until we find the region node
-        let currentObject = e.object;
-        while (currentObject.parent && currentObject.parent !== groupRef.current) {
-          currentObject = currentObject.parent;        }        const regionName = currentObject.name.replace(/^_+/, "").replace(/[\*\?]/g, "");
-        onSelect(regionName);
-        console.log("Selected region:", regionName);
+        
+        // Find which region this mesh belongs to by checking its ancestors
+        let searchObject: THREE.Object3D | null = e.object as THREE.Object3D;
+        const regionNodes = Array.from(regionNodesRef.current.values());
+        
+        while (searchObject && !regionNodes.includes(searchObject)) {
+          searchObject = searchObject.parent;
+        }
+        
+        if (searchObject) {
+          // Find the region name from our map
+          for (const [regionName, obj] of regionNodesRef.current.entries()) {
+            if (obj === searchObject) {
+              console.log("Found region:", regionName);
+              onSelect(regionName);
+              return;
+            }
+          }
+        }
+        
+        console.log("No matching region found");
       }}
     />
   );
