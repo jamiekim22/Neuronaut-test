@@ -8,6 +8,7 @@ const regions = fs
   .trim()
   .split("\n")
   .slice(1)            // drop header
+  .map(id => id.trim())  // remove any whitespace/carriage returns
   .filter(Boolean);
 
 // Convert a regionId into a Wikipedia page title
